@@ -5,8 +5,10 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import EventCard from "./EventCard"
 import EventModal from "./EventModal"
+import EventForm from "./EventForm"
 import ViewSwitcher from "./ViewSwitcher"
 import MonthScrollbar from "./MonthScrollbar"
+import { useMediaQuery } from "./hooks/useMediaQuery"
 
 interface Position {
   left: number
@@ -39,7 +41,7 @@ interface NoticeboardProps {
   cardSize?: "small" | "medium" | "large"
 }
 
-type ViewType = "noticeboard" | "grid" | "list"
+type ViewType = "noticeboard" | "list"
 
 // Helper function to parse date from string
 const parseDate = (dateStr: string): Date => {
@@ -78,10 +80,12 @@ const parseDate = (dateStr: string): Date => {
   return new Date()
 }
 
+const STORAGE_KEY = "noticeboard_events"
+
 const NoticeBoard: React.FC<NoticeboardProps> = ({
-  events,
-  spreadFactor = 80,
-  rotationRange = 8,
+  events: initialEvents,
+  spreadFactor = 60, // Reduced spread factor to keep cards more organized
+  rotationRange = 5, // Reduced rotation for better readability
   gridRows,
   gridCols,
   cardWidth = 15,
@@ -90,15 +94,64 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
   background = "bg-slate-200 bg-[radial-gradient(#cccccc_5%,#fff_5%)] bg-[length:50px_50px]",
   cardSize = "medium",
 }) => {
+  const [events, setEvents] = useState<EventDetails[]>(initialEvents)
   const [positions, setPositions] = useState<Position[]>([])
   const [selectedEvent, setSelectedEvent] = useState<EventDetails | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [clickedCardRect, setClickedCardRect] = useState<DOMRect | null>(null)
   const [viewType, setViewType] = useState<ViewType>("noticeboard")
   const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth())
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const positionsRef = useRef<Position[]>([])
+
+  // Check if we're on mobile
+  const isMobile = useMediaQuery("(max-width: 768px)")
+
+  // Adjust card size for mobile
+  const mobileCardWidth = isMobile ? 40 : cardWidth // Wider cards on mobile
+  const mobileCardHeight = isMobile ? 35 : cardHeight // Taller cards on mobile
+  const effectiveCardWidth = mobileCardWidth
+  const effectiveCardHeight = mobileCardHeight
+
+  // Load events from localStorage on initial render
+  useEffect(() => {
+    const loadEvents = () => {
+      try {
+        const storedEvents = localStorage.getItem(STORAGE_KEY)
+        if (storedEvents) {
+          const parsedEvents = JSON.parse(storedEvents) as EventDetails[]
+          setEvents(parsedEvents)
+        }
+      } catch (error) {
+        console.error("Failed to load events from localStorage:", error)
+      }
+    }
+
+    loadEvents()
+  }, [])
+
+  // Save events to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
+    } catch (error) {
+      console.error("Failed to save events to localStorage:", error)
+    }
+  }, [events])
+
+  // Extract unique categories from events
+  const categories = useMemo(() => {
+    const uniqueCategories = new Set<string>()
+    events.forEach((event) => {
+      if (event.category) {
+        uniqueCategories.add(event.category)
+      }
+    })
+    return Array.from(uniqueCategories)
+  }, [events])
 
   // Organize events by month - memoized to prevent recalculation on every render
   const eventsByMonth = useMemo(() => {
@@ -115,10 +168,17 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
     }, {})
   }, [events])
 
-  // Get events for the current month - memoized to prevent recalculation on every render
+  // Get events for the current month and apply filters
   const currentMonthEvents = useMemo(() => {
-    return eventsByMonth[currentMonth] || []
-  }, [eventsByMonth, currentMonth])
+    const monthEvents = eventsByMonth[currentMonth] || []
+
+    // Apply category filter if any categories are selected
+    if (selectedCategories.length > 0) {
+      return monthEvents.filter((event) => selectedCategories.includes(event.category))
+    }
+
+    return monthEvents
+  }, [eventsByMonth, currentMonth, selectedCategories])
 
   // Function to check if two cards overlap
   const doCardsOverlap = (
@@ -173,39 +233,61 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
     setCurrentMonth(month)
   }
 
+  // Handle filter change
+  const handleFilterChange = (categories: string[]) => {
+    setSelectedCategories(categories)
+  }
+
+  // Handle adding a new event
+  const handleAddEvent = () => {
+    setIsFormOpen(true)
+  }
+
+  // Handle saving a new event
+  const handleSaveEvent = (newEvent: Omit<EventDetails, "id">) => {
+    const newId = Math.max(0, ...events.map((e) => e.id)) + 1
+    const eventWithId = { ...newEvent, id: newId }
+    setEvents((prevEvents) => [...prevEvents, eventWithId])
+    setIsFormOpen(false)
+  }
+
   // Calculate grid dimensions - memoized to prevent recalculation on every render
   const calculateGrid = useMemo(() => {
-    if (!containerRef.current) return { rows: 3, cols: 4 }
+    if (!containerRef.current) return { rows: 3, cols: isMobile ? 2 : 4 }
 
     const totalCards = currentMonthEvents.length
     if (totalCards === 0) return { rows: 1, cols: 1 }
 
-    const containerWidth = containerRef.current.clientWidth
-    const containerHeight = containerRef.current.clientHeight
-    const aspectRatio = containerWidth / containerHeight
+    // For mobile, limit to 2 columns max
+    const maxCols = isMobile ? 2 : 4
 
-    // Adjust card dimensions based on view type
-    const effectiveCardWidth = viewType === "noticeboard" ? cardWidth : viewType === "grid" ? 25 : 90
-    const effectiveCardHeight = viewType === "noticeboard" ? cardHeight : viewType === "grid" ? 30 : 15
-
-    if (!gridRows && !gridCols) {
-      // Auto-calculate reasonable grid dimensions
-      const calculatedCols = Math.ceil(Math.sqrt(totalCards * aspectRatio))
-      const calculatedRows = Math.ceil(totalCards / calculatedCols)
-
-      // For list view, use 1 column
-      if (viewType === "list") {
-        return { rows: totalCards, cols: 1 }
+    if (viewType === "list") {
+      return { rows: totalCards, cols: 1 }
+    } else {
+      // For noticeboard view
+      // If there's only one card, use 1 column
+      if (totalCards === 1) {
+        return { rows: 1, cols: 1 }
       }
+
+      // For mobile, use 1 or 2 columns based on number of cards
+      if (isMobile) {
+        const cols = totalCards < 3 ? totalCards : 2
+        const rows = Math.ceil(totalCards / cols)
+        return { rows, cols }
+      }
+
+      // For desktop, calculate based on aspect ratio
+      const containerWidth = containerRef.current.clientWidth
+      const containerHeight = containerRef.current.clientHeight
+      const aspectRatio = containerWidth / containerHeight
+
+      const calculatedCols = Math.min(maxCols, Math.ceil(Math.sqrt(totalCards * aspectRatio)))
+      const calculatedRows = Math.ceil(totalCards / calculatedCols)
 
       return { rows: calculatedRows, cols: calculatedCols }
     }
-
-    return {
-      rows: gridRows || Math.ceil(totalCards / (gridCols || 4)),
-      cols: gridCols || Math.ceil(totalCards / (gridRows || 3)),
-    }
-  }, [currentMonthEvents.length, viewType, cardWidth, cardHeight, gridRows, gridCols, containerRef.current])
+  }, [currentMonthEvents.length, viewType, isMobile, containerRef.current])
 
   // Calculate positions based on view type
   useEffect(() => {
@@ -214,28 +296,24 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
 
     // Function to calculate positions
     const calculatePositions = () => {
-      // Adjust card dimensions based on view type
-      const effectiveCardWidth = viewType === "noticeboard" ? cardWidth : viewType === "grid" ? 25 : 90
-      const effectiveCardHeight = viewType === "noticeboard" ? cardHeight : viewType === "grid" ? 30 : 15
-
       // Create a grid-based arrangement
       const gridPositions: Position[] = []
 
-      for (let i = 0; i < currentMonthEvents.length; i++) {
-        // Calculate grid cell
-        const row = Math.floor(i / calculateGrid.cols)
-        const col = i % calculateGrid.cols
+      // Get the board dimensions
+      const boardWidth = containerRef.current?.clientWidth || 1000
+      const boardHeight = containerRef.current?.clientHeight || 800
 
-        // Calculate cell dimensions
-        const cellWidth = 100 / calculateGrid.cols
-        const cellHeight = 100 / calculateGrid.rows
+      // Calculate the effective padding in pixels
+      const horizontalPadding = boardWidth * 0.05 // 5% of board width
+      const verticalPadding = boardHeight * 0.05 // 5% of board height
 
-        // Position card in its cell with some padding
-        let baseLeft = col * cellWidth + (cellWidth - effectiveCardWidth) / 2
-        let baseTop = row * cellHeight + (cellHeight - effectiveCardHeight) / 2
+      // Calculate the available space
+      const availableWidth = boardWidth - 2 * horizontalPadding
+      const availableHeight = boardHeight - 2 * verticalPadding
 
-        // For list view, stack vertically with no rotation
-        if (viewType === "list") {
+      // For list view, stack vertically with no rotation
+      if (viewType === "list") {
+        for (let i = 0; i < currentMonthEvents.length; i++) {
           const newPos: Position = {
             left: 5, // 5% margin from left
             top: i * (effectiveCardHeight + 2), // Stack with 2% gap
@@ -243,62 +321,69 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
             zIndex: i,
           }
           gridPositions.push(newPos)
-          continue
         }
+      }
+      // For noticeboard view, prioritize top positioning
+      else {
+        const { cols } = calculateGrid
 
-        // For grid view, use regular grid with no rotation and less randomness
-        if (viewType === "grid") {
-          const randomOffsetX = (((Math.random() - 0.5) * 10) / 100) * cellWidth // Much less randomness
-          const randomOffsetY = (((Math.random() - 0.5) * 10) / 100) * cellHeight
+        // Start with a top-down approach
+        for (let i = 0; i < currentMonthEvents.length; i++) {
+          // Calculate preferred position (top-down, left-right)
+          const preferredRow = Math.floor(i / cols)
+          const preferredCol = i % cols
 
-          const newPos: Position = {
-            left: Math.max(0, Math.min(100 - effectiveCardWidth, baseLeft + randomOffsetX)),
-            top: Math.max(0, Math.min(100 - effectiveCardHeight, baseTop + randomOffsetY)),
-            rotate: 0, // No rotation
-            zIndex: i,
+          // Calculate cell dimensions
+          const cellWidth = 100 / cols
+          const cellHeight = 100 / calculateGrid.rows
+
+          // Base position (centered in cell)
+          let baseLeft = preferredCol * cellWidth + (cellWidth - effectiveCardWidth) / 2
+          let baseTop = preferredRow * cellHeight + (cellHeight - effectiveCardHeight) / 2
+
+          // Ensure we stay within the padding boundaries
+          baseLeft = Math.max(5, Math.min(95 - effectiveCardWidth, baseLeft))
+          baseTop = Math.max(5, Math.min(95 - effectiveCardHeight, baseTop))
+
+          // For single card, position it near the top
+          if (currentMonthEvents.length === 1) {
+            baseTop = 10 // 10% from the top
+            baseLeft = 50 - effectiveCardWidth / 2 // Centered horizontally
           }
+
+          // Try multiple positions with decreasing randomness
+          let attempts = 0
+          let newPos: Position
+          const maxAttempts = 30
+
+          do {
+            // Calculate random offsets (decreasing with attempts)
+            const randomFactor = Math.max(0, spreadFactor * (1 - attempts / maxAttempts))
+            const randomOffsetX = (((Math.random() - 0.5) * randomFactor) / 100) * cellWidth
+            const randomOffsetY = (((Math.random() - 0.5) * randomFactor) / 100) * cellHeight
+
+            // Apply offsets and ensure bounds
+            newPos = {
+              left: Math.max(5, Math.min(95 - effectiveCardWidth, baseLeft + randomOffsetX)),
+              top: Math.max(5, Math.min(95 - effectiveCardHeight, baseTop + randomOffsetY)),
+              rotate: Math.random() * rotationRange * 2 - rotationRange,
+              zIndex: currentMonthEvents.length - i, // Higher z-index for earlier events
+            }
+
+            // Check against all existing positions
+            const overlaps = gridPositions.some((pos) =>
+              doCardsOverlap(pos, newPos, effectiveCardWidth, effectiveCardHeight),
+            )
+
+            if (!overlaps || attempts > maxAttempts) {
+              break
+            }
+
+            attempts++
+          } while (attempts <= maxAttempts)
+
           gridPositions.push(newPos)
-          continue
         }
-
-        // For noticeboard view, use controlled randomness
-        let attempts = 0
-        let newPos: Position
-        const maxAttempts = 30 // Increase max attempts to reduce overlap
-
-        do {
-          // Calculate random offsets
-          const randomOffsetX = (((Math.random() - 0.5) * spreadFactor) / 100) * cellWidth
-          const randomOffsetY = (((Math.random() - 0.5) * spreadFactor) / 100) * cellHeight
-
-          // Apply offsets and ensure bounds
-          newPos = {
-            left: Math.max(0, Math.min(100 - effectiveCardWidth, baseLeft + randomOffsetX)),
-            top: Math.max(0, Math.min(100 - effectiveCardHeight, baseTop + randomOffsetY)),
-            rotate: Math.random() * rotationRange * 2 - rotationRange,
-            zIndex: i, // Default z-index
-          }
-
-          // Check against all existing positions
-          const overlaps = gridPositions.some((pos) =>
-            doCardsOverlap(pos, newPos, effectiveCardWidth, effectiveCardHeight),
-          )
-
-          if (!overlaps || attempts > maxAttempts) {
-            // Either doesn't overlap or we've tried too many times
-            break
-          }
-
-          // If we're getting too many attempts, gradually reduce the randomness
-          if (attempts > 15) {
-            baseLeft = col * cellWidth + (cellWidth - effectiveCardWidth) / 2
-            baseTop = row * cellHeight + (cellHeight - effectiveCardHeight) / 2
-          }
-
-          attempts++
-        } while (attempts <= maxAttempts)
-
-        gridPositions.push(newPos)
       }
 
       // Only update positions if they've actually changed
@@ -318,7 +403,17 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
 
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
-  }, [currentMonthEvents, spreadFactor, rotationRange, cardWidth, cardHeight, padding, viewType, calculateGrid])
+  }, [
+    currentMonthEvents,
+    spreadFactor,
+    rotationRange,
+    effectiveCardWidth,
+    effectiveCardHeight,
+    padding,
+    viewType,
+    calculateGrid,
+    isMobile,
+  ])
 
   // Prepare card refs array
   useEffect(() => {
@@ -326,18 +421,32 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
   }, [currentMonthEvents])
 
   return (
-    <div className="flex h-full w-full">
-      {/* Month scrollbar */}
-      
+    <div className={`flex h-full w-full flex-col md:flex-row ${isMobile ? "overflow-hidden" : ""}`}>
+      {/* Month scrollbar - hidden on mobile in portrait */}
+      <div className={`${isMobile ? "h-12 w-full overflow-x-auto" : "w-16"}`}>
+        <MonthScrollbar
+          currentMonth={currentMonth}
+          onMonthChange={handleMonthChange}
+          orientation={isMobile ? "horizontal" : "vertical"}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col">
-        <ViewSwitcher currentView={viewType} onViewChange={setViewType} />
+        <ViewSwitcher
+          currentView={viewType}
+          onViewChange={setViewType}
+          categories={categories}
+          selectedCategories={selectedCategories}
+          onFilterChange={handleFilterChange}
+          onAddEvent={handleAddEvent}
+        />
 
         <div
           ref={containerRef}
-          className={`flex-1 p-8 w-full ${viewType === "noticeboard" ? background : "bg-gray-50"} overflow-auto`}
+          className={`flex-1 p-4 md:p-8 w-full ${viewType === "noticeboard" ? background : "bg-gray-50"
+            } overflow-auto relative`}
         >
-          <div className={`relative h-full w-full ${viewType === "list" ? "flex flex-col gap-2" : ""}`}>
+          <div className={`relative h-full w-full ${viewType === "list" ? "flex flex-col gap-4 p-2" : ""}`}>
             {currentMonthEvents.map((event, index) => (
               <motion.div
                 key={event.id}
@@ -346,10 +455,10 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
                 style={
                   viewType !== "list"
                     ? {
-                        left: `${positions[index]?.left || 0}%`,
-                        top: `${positions[index]?.top || 0}%`,
-                        zIndex: positions[index]?.zIndex || 0,
-                      }
+                      left: `${positions[index]?.left || 0}%`,
+                      top: `${positions[index]?.top || 0}%`,
+                      zIndex: positions[index]?.zIndex || 0,
+                    }
                     : {}
                 }
                 initial={{
@@ -374,13 +483,12 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
                   transition: { duration: 0.2 },
                 }}
                 onClick={() => handleCardClick(event, index)}
-                layoutId={`card-${event.id}`}
               >
                 <EventCard
                   eventDetails={event}
                   pinColor={event.category === "featured" ? "blue" : "red"}
                   hoverEffect="scale"
-                  size={cardSize}
+                  size={isMobile ? "medium" : cardSize}
                   viewType={viewType}
                 />
               </motion.div>
@@ -390,7 +498,11 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
               <div className="flex items-center justify-center h-full w-full">
                 <div className="text-center p-8 bg-white/80 rounded-lg shadow-sm">
                   <h3 className="text-xl font-semibold text-gray-700 mb-2">No events this month</h3>
-                  <p className="text-gray-500">Try selecting a different month or adding new events.</p>
+                  <p className="text-gray-500">
+                    {selectedCategories.length > 0
+                      ? "Try selecting different categories or changing the month."
+                      : "Try selecting a different month or adding new events."}
+                  </p>
                 </div>
               </div>
             )}
@@ -398,6 +510,7 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
         </div>
       </div>
 
+      {/* Full event modal */}
       <AnimatePresence>
         {isModalOpen && selectedEvent && (
           <EventModal
@@ -405,11 +518,18 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
             isOpen={isModalOpen}
             onClose={closeModal}
             sourceRect={clickedCardRect}
-            layoutId={`card-${selectedEvent.id}`}
+            isMobile={isMobile}
           />
         )}
       </AnimatePresence>
-      <MonthScrollbar currentMonth={currentMonth} onMonthChange={handleMonthChange} />
+
+      {/* Event form */}
+      <EventForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSave={handleSaveEvent}
+        categories={categories}
+      />
     </div>
   )
 }

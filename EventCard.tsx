@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Calendar, MapPin, DollarSign } from "lucide-react"
 
 interface EventDetails {
   id: number
@@ -18,7 +19,7 @@ interface EventCardProps {
   pinColor?: "red" | "blue" | "green" | "yellow"
   hoverEffect?: "scale" | "rotate" | "lift" | "none"
   size?: "small" | "medium" | "large"
-  viewType?: "noticeboard" | "grid" | "list"
+  viewType?: "noticeboard" | "list"
 }
 
 const EventCard: React.FC<EventCardProps> = ({
@@ -47,8 +48,6 @@ const EventCard: React.FC<EventCardProps> = ({
   const getSizeClass = () => {
     if (viewType === "list") {
       return "w-full h-full"
-    } else if (viewType === "grid") {
-      return "w-full h-full"
     } else {
       return sizeClasses[size]
     }
@@ -58,9 +57,9 @@ const EventCard: React.FC<EventCardProps> = ({
   if (viewType === "list") {
     return (
       <div className={`${getSizeClass()} transform transition-transform duration-300`}>
-        <div className="w-full h-full bg-white rounded-md shadow-lg overflow-hidden border border-gray-200 flex">
+        <div className="w-full bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 flex h-24 md:h-28">
           {/* Image */}
-          <div className="w-1/4 overflow-hidden">
+          <div className="w-24 md:w-32 overflow-hidden">
             <img
               src={eventDetails.image || "/placeholder.svg"}
               alt={eventDetails.name}
@@ -69,44 +68,25 @@ const EventCard: React.FC<EventCardProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-4 flex-1 flex flex-col">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-lg mb-1">{eventDetails.name}</h3>
-                <p className="text-sm text-gray-600 mb-1">{eventDetails.date}</p>
+          <div className="p-3 flex-1 flex flex-col justify-between">
+            <div>
+              <h3 className="font-bold text-sm md:text-base line-clamp-1">{eventDetails.name}</h3>
+              <div className="flex items-center text-xs text-gray-600 mt-1">
+                <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                <span className="line-clamp-1">{eventDetails.date}</span>
               </div>
-              <span className="text-sm font-semibold bg-gray-100 px-2 py-1 rounded-full">{eventDetails.price}</span>
+              <div className="flex items-center text-xs text-gray-600 mt-1">
+                <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                <span className="line-clamp-1">{eventDetails.location}</span>
+              </div>
             </div>
-            <p className="text-sm text-gray-600 mb-2">{eventDetails.location}</p>
-            <p className="text-sm text-gray-700 line-clamp-2 mt-auto">{eventDetails.description}</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (viewType === "grid") {
-    return (
-      <div className={`${getSizeClass()} transform transition-transform duration-300`}>
-        <div className="w-full h-full bg-white rounded-md shadow-lg overflow-hidden border border-gray-200">
-          {/* Image */}
-          <div className="w-full h-1/2 overflow-hidden">
-            <img
-              src={eventDetails.image || "/placeholder.svg"}
-              alt={eventDetails.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          {/* Content */}
-          <div className="p-4 h-1/2 flex flex-col">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-bold text-base line-clamp-1">{eventDetails.name}</h3>
-              <span className="text-xs font-semibold bg-gray-100 px-2 py-1 rounded-full">{eventDetails.price}</span>
+            <div className="flex justify-between items-center mt-1">
+              <span className="text-xs font-semibold flex items-center">
+                <DollarSign className="h-3 w-3 mr-0.5" />
+                {eventDetails.price}
+              </span>
+              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{eventDetails.category}</span>
             </div>
-            <p className="text-xs text-gray-600 mb-1">{eventDetails.date}</p>
-            <p className="text-xs text-gray-600 mb-2 line-clamp-1">{eventDetails.location}</p>
-            <p className="text-xs text-gray-700 line-clamp-2 mt-auto">{eventDetails.description}</p>
           </div>
         </div>
       </div>
@@ -125,21 +105,30 @@ const EventCard: React.FC<EventCardProps> = ({
       {/* Card */}
       <div className="w-full h-full bg-white rounded-md shadow-lg overflow-hidden border border-gray-200">
         {/* Image */}
-        <div className="w-full h-1/2 overflow-hidden">
+        <div className="w-full h-1/2 overflow-hidden relative">
           <img
             src={eventDetails.image || "/placeholder.svg"}
             alt={eventDetails.name}
             className="w-full h-full object-cover"
           />
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+            <span className="text-xs font-medium text-white">{eventDetails.date}</span>
+          </div>
         </div>
 
         {/* Content */}
         <div className="p-3 h-1/2 flex flex-col">
-          <h3 className="font-bold text-sm mb-1 line-clamp-1">{eventDetails.name}</h3>
-          <p className="text-xs text-gray-600 mb-1">{eventDetails.date}</p>
-          <p className="text-xs text-gray-600 mb-1 line-clamp-1">{eventDetails.location}</p>
-          <div className="mt-auto">
-            <span className="text-xs font-semibold">{eventDetails.price}</span>
+          <h3 className="font-bold text-sm mb-1 line-clamp-2">{eventDetails.name}</h3>
+          <div className="flex items-center text-xs text-gray-600 mb-1">
+            <MapPin className="h-3 w-3 mr-1" />
+            <span className="line-clamp-1">{eventDetails.location}</span>
+          </div>
+          <div className="mt-auto flex items-center justify-between">
+            <span className="text-xs font-semibold flex items-center">
+              <DollarSign className="h-3 w-3 mr-0.5" />
+              {eventDetails.price}
+            </span>
+            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{eventDetails.category}</span>
           </div>
         </div>
       </div>
