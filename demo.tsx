@@ -5,7 +5,7 @@ import NoticeBoard from "./NoticeBoard"
 const events = [
   {
     id: 1,
-    image: "/placeholder.svg?height=300&width=400",
+    image: "/retro.jpg?height=300&width=400",
     name: "Summer Music Festival",
     date: "July 15-17, 2023",
     location: "Central Park, New York",

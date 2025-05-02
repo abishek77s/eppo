@@ -45,7 +45,7 @@ const MonthScrollbar: React.FC<MonthScrollbarProps> = ({ currentMonth, onMonthCh
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 />
               )}
-              <span className="relative z-10 text-sm">{month}</span>
+              <span className="relative z-10 text-sm">{month.substring(0, 3)}</span>
             </div>
           ))}
         </div>

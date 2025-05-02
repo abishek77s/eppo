@@ -26,7 +26,7 @@ const EventCard: React.FC<EventCardProps> = ({
   eventDetails,
   pinColor = "red",
   hoverEffect = "none",
-  size = "medium",
+  size = "small",
   viewType = "noticeboard",
 }) => {
   // Size mappings
