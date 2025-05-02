@@ -443,8 +443,9 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
 
         <div
           ref={containerRef}
-          className={`flex-1 p-4 md:p-8 w-full ${viewType === "noticeboard" ? background : "bg-gray-50"
-            } overflow-auto relative`}
+          className={`flex-1 p-4 md:p-8 w-full ${
+            viewType === "noticeboard" ? background : "bg-gray-50"
+          } overflow-auto relative`}
         >
           <div className={`relative h-full w-full ${viewType === "list" ? "flex flex-col gap-4 p-2" : ""}`}>
             {currentMonthEvents.map((event, index) => (
@@ -455,10 +456,10 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
                 style={
                   viewType !== "list"
                     ? {
-                      left: `${positions[index]?.left || 0}%`,
-                      top: `${positions[index]?.top || 0}%`,
-                      zIndex: positions[index]?.zIndex || 0,
-                    }
+                        left: `${positions[index]?.left || 0}%`,
+                        top: `${positions[index]?.top || 0}%`,
+                        zIndex: positions[index]?.zIndex || 0,
+                      }
                     : {}
                 }
                 initial={{
