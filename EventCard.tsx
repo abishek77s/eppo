@@ -105,7 +105,7 @@ const EventCard: React.FC<EventCardProps> = ({
       {/* Card */}
       <div className="w-full h-full bg-white rounded-md shadow-lg overflow-hidden border border-gray-200">
         {/* Image */}
-        <div className="w-full h-1/2 overflow-hidden relative">
+        <div className="w-full h-4/5 overflow-hidden relative">
           <img
             src={eventDetails.image || "/placeholder.svg"}
             alt={eventDetails.name}
@@ -117,19 +117,10 @@ const EventCard: React.FC<EventCardProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-3 h-1/2 flex flex-col">
-          <h3 className="font-bold text-sm mb-1 line-clamp-2">{eventDetails.name}</h3>
-          <div className="flex items-center text-xs text-gray-600 mb-1">
-            <MapPin className="h-3 w-3 mr-1" />
-            <span className="line-clamp-1">{eventDetails.location}</span>
-          </div>
-          <div className="mt-auto flex items-center justify-between">
-            <span className="text-xs font-semibold flex items-center">
-              <DollarSign className="h-3 w-3 mr-0.5" />
-              {eventDetails.price}
-            </span>
-            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{eventDetails.category}</span>
-          </div>
+        <div className="p-3 h-1/2 flex flex-col ">
+          <h3 className="font-bold text-sm  line-clamp-2">{eventDetails.name}</h3>
+          
+         
         </div>
       </div>
     </div>
