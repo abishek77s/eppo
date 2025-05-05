@@ -81,10 +81,7 @@ const EventCard: React.FC<EventCardProps> = ({
               </div>
             </div>
             <div className="flex justify-between items-center mt-1">
-              <span className="text-xs font-semibold flex items-center">
-                <DollarSign className="h-3 w-3 mr-0.5" />
-                {eventDetails.price}
-              </span>
+
               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{eventDetails.category}</span>
             </div>
           </div>

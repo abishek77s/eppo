@@ -423,7 +423,7 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
   return (
     <div className={`flex h-full w-full flex-col md:flex-row ${isMobile ? "overflow-hidden" : ""}`}>
       {/* Month scrollbar - hidden on mobile in portrait */}
-      <div className={`${isMobile ? "h-12 w-full overflow-x-auto" : "w-16"}`}>
+      <div className={`${isMobile ? " w-full overflow-x-auto" : "w-16"}`}>
         <MonthScrollbar
           currentMonth={currentMonth}
           onMonthChange={handleMonthChange}
@@ -480,7 +480,7 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
                 }}
                 whileHover={{
                   scale: 1.05,
-                  zIndex: 100,
+                  zIndex: 30,
                   transition: { duration: 0.2 },
                 }}
                 onClick={() => handleCardClick(event, index)}

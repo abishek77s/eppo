@@ -22,7 +22,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   onAddEvent,
 }) => {
   return (
-    <div className="flex items-center justify-between p-4 bg-white border-b">
+    <div className="flex items-center justify-between px-4 p-3 bg-white border-b">
       <h1 className="text-xl font-bold">Event Board</h1>
 
       <div className="flex items-center space-x-2">
