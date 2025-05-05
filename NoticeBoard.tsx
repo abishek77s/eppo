@@ -421,117 +421,120 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
   }, [currentMonthEvents])
 
   return (
-    <div className={`flex h-full w-full flex-col md:flex-row ${isMobile ? "overflow-hidden" : ""}`}>
-      {/* Month scrollbar - hidden on mobile in portrait */}
-      <div className={`${isMobile ? " w-full overflow-x-auto" : "w-16"}`}>
-        <MonthScrollbar
-          currentMonth={currentMonth}
-          onMonthChange={handleMonthChange}
-          orientation={isMobile ? "horizontal" : "vertical"}
-        />
-      </div>
-
-      <div className="flex-1 flex flex-col">
-        <ViewSwitcher
-          currentView={viewType}
-          onViewChange={setViewType}
-          categories={categories}
-          selectedCategories={selectedCategories}
-          onFilterChange={handleFilterChange}
-          onAddEvent={handleAddEvent}
-        />
-
-        <div
-          ref={containerRef}
-          className={`flex-1 p-4 md:p-8 w-full ${
-            viewType === "noticeboard" ? background : "bg-gray-50"
-          } overflow-auto relative`}
-        >
-          <div className={`relative h-full w-full ${viewType === "list" ? "flex flex-col gap-4 p-2" : ""}`}>
-            {currentMonthEvents.map((event, index) => (
-              <motion.div
-                key={event.id}
-                ref={(el) => (cardRefs.current[index] = el)}
-                className={`${viewType !== "list" ? "absolute" : ""} cursor-pointer`}
-                style={
-                  viewType !== "list"
-                    ? {
-                        left: `${positions[index]?.left || 0}%`,
-                        top: `${positions[index]?.top || 0}%`,
-                        zIndex: positions[index]?.zIndex || 0,
-                      }
-                    : {}
-                }
-                initial={{
-                  opacity: 0,
-                  scale: 0.8,
-                  rotate: viewType === "noticeboard" ? positions[index]?.rotate || 0 : 0,
-                }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                  rotate: viewType === "noticeboard" ? positions[index]?.rotate || 0 : 0,
-                  transition: {
-                    delay: index * 0.05,
-                    duration: 0.5,
-                    type: "spring",
-                    stiffness: 100,
-                  },
-                }}
-                whileHover={{
-                  scale: 1.05,
-                  zIndex: 30,
-                  transition: { duration: 0.2 },
-                }}
-                onClick={() => handleCardClick(event, index)}
-              >
-                <EventCard
-                  eventDetails={event}
-                  pinColor={event.category === "featured" ? "blue" : "red"}
-                  hoverEffect="scale"
-                  size={isMobile ? "medium" : cardSize}
-                  viewType={viewType}
-                />
-              </motion.div>
-            ))}
-
-            {currentMonthEvents.length === 0 && (
-              <div className="flex items-center justify-center h-full w-full">
-                <div className="text-center p-8 bg-white/80 rounded-lg shadow-sm">
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">No events this month</h3>
-                  <p className="text-gray-500">
-                    {selectedCategories.length > 0
-                      ? "Try selecting different categories or changing the month."
-                      : "Try selecting a different month or adding new events."}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Full event modal */}
-      <AnimatePresence>
-        {isModalOpen && selectedEvent && (
-          <EventModal
-            event={selectedEvent}
-            isOpen={isModalOpen}
-            onClose={closeModal}
-            sourceRect={clickedCardRect}
-            isMobile={isMobile}
+        <div>
+          <ViewSwitcher
+            currentView={viewType}
+            onViewChange={setViewType}
+            categories={categories}
+            selectedCategories={selectedCategories}
+            onFilterChange={handleFilterChange}
+            onAddEvent={handleAddEvent}
           />
-        )}
-      </AnimatePresence>
-
-      {/* Event form */}
-      <EventForm
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSave={handleSaveEvent}
-        categories={categories}
-      />
-    </div>
+              <div className={`flex h-full w-full flex-col md:flex-row ${isMobile ? "overflow-hidden" : ""}`}>
+                {/* Month scrollbar - hidden on mobile in portrait */}
+                <div className={`${isMobile ? " w-full overflow-x-auto" : "w-16"}`}>
+          <MonthScrollbar
+            currentMonth={currentMonth}
+            onMonthChange={handleMonthChange}
+            orientation={isMobile ? "horizontal" : "vertical"}
+          />
+                </div>
+          
+                <div className="flex-1 flex flex-col">
+          <div
+            ref={containerRef}
+            className={`flex-1 p-4 md:p-8 w-full ${
+              viewType === "noticeboard" ? background : "bg-gray-50"
+            } overflow-auto relative`}
+          >
+            <div className={`relative h-full w-full ${viewType === "list" ? "flex flex-col gap-4 p-2" : ""}`}>
+              {currentMonthEvents.map((event, index) => (
+                <motion.div
+                  key={event.id}
+                  ref={(el: HTMLDivElement | null) => {
+                    cardRefs.current[index] = el;
+                  }}
+          
+                  className={`${viewType !== "list" ? "absolute" : ""} cursor-pointer`}
+                  style={
+                    viewType !== "list"
+                      ? {
+                          left: `${positions[index]?.left || 0}%`,
+                          top: `${positions[index]?.top || 0}%`,
+                          zIndex: positions[index]?.zIndex || 0,
+                        }
+                      : {}
+                  }
+                  initial={{
+                    opacity: 0,
+                    scale: 0.8,
+                    rotate: viewType === "noticeboard" ? positions[index]?.rotate || 0 : 0,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                    rotate: viewType === "noticeboard" ? positions[index]?.rotate || 0 : 0,
+                    transition: {
+                      delay: index * 0.05,
+                      duration: 0.5,
+                      type: "spring",
+                      stiffness: 100,
+                    },
+                  }}
+                  whileHover={{
+                    scale: 1.05,
+                    zIndex: 30,
+                    transition: { duration: 0.2 },
+                  }}
+                  onClick={() => handleCardClick(event, index)}
+                >
+                  <EventCard
+                    eventDetails={event}
+                    pinColor={event.category === "featured" ? "blue" : "red"}
+                    hoverEffect="scale"
+                    size={isMobile ? "medium" : cardSize}
+                    viewType={viewType}
+                  />
+                </motion.div>
+              ))}
+              {currentMonthEvents.length === 0 && (
+                <div className="flex items-center justify-center h-full w-full">
+                  <div className="text-center p-8 bg-white/80 rounded-lg shadow-sm">
+                    <h3 className="text-xl font-semibold text-gray-700 mb-2">No events this month</h3>
+                    <p className="text-gray-500">
+                      {selectedCategories.length > 0
+                        ? "Try selecting different categories or changing the month."
+                        : "Try selecting a different month or adding new events."}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+                </div>
+          
+                {/* Full event modal */}
+                <AnimatePresence>
+          {isModalOpen && selectedEvent && (
+            <EventModal
+              event={selectedEvent}
+              isOpen={isModalOpen}
+              onClose={closeModal}
+              sourceRect={clickedCardRect}
+              isMobile={isMobile}
+            />
+          )}
+                </AnimatePresence>
+          
+                {/* Event form */}
+                <EventForm
+          isOpen={isFormOpen}
+          onClose={() => setIsFormOpen(false)}
+          onSave={handleSaveEvent}
+          categories={categories}
+                />
+              </div>
+        </div>
   )
 }
 
