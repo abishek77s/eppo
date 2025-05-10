@@ -23,7 +23,11 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
 }) => {
   return (
     <div className="flex items-center justify-between px-4 p-3 bg-white border-b">
-      <h1 className="text-xl font-bold">Event Board</h1>
+      <div className="flex  items-center gap-2">
+        <h1 className="text-xl font-bold">eppo</h1>
+        <p> /Kollywood Blockbusters </p>
+        <p> /2025 </p>
+      </div>
 
       <div className="flex items-center space-x-2">
         <button
