@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                Int      @id @default(autoincrement())
+  email             String   @unique
+  password          String
+  name              String?
+  eventLists        EventList[]
+  sharedEventLists  SharedEventList[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Event {
+  id            Int      @id @default(autoincrement())
+  name          String
+  date          String // Consider changing to DateTime if precise date/time operations are needed
+  location      String
+  description   String
+  price         String // Consider changing to Float or Decimal for calculations
+  category      String
+  image         String?
+  eventListId   Int
+  eventList     EventList @relation(fields: [eventListId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  positionX     Float?   // For fixed positioning
+  positionY     Float?   // For fixed positioning
+  isPinned      Boolean  @default(false) // Alternative for fixed positioning
+  pinOrder      Int?     // Alternative for fixed positioning
+}
+
+model EventList {
+  id            Int      @id @default(autoincrement())
+  name          String   @default("My Events")
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id])
+  events        Event[]
+  sharedWith    SharedEventList[]
+  isPublic      Boolean  @default(false) // For public sharing
+  forkedFromId  Int?     // To track the source of a fork
+  forkedFrom    EventList? @relation("EventListForks", fields: [forkedFromId], references: [id])
+  forks         EventList[] @relation("EventListForks")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SharedEventList {
+  id          Int      @id @default(autoincrement())
+  eventListId Int
+  eventList   EventList @relation(fields: [eventListId], references: [id])
+  userId      Int      // The user with whom the list is shared
+  user        User     @relation(fields: [userId], references: [id])
+  permission  String   @default("VIEW_ONLY") // e.g., "VIEW_ONLY", "EDIT"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([eventListId, userId]) // Ensure a list is shared only once with a user
+}
