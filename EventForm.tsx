@@ -4,53 +4,112 @@ import type React from "react"
 import { useState } from "react"
 import { X } from "lucide-react"
 
-interface EventDetails {
-  id: number
-  image: string
-  name: string
-  date: string
-  location: string
-  description: string
-  price: string
-  category: string
+import { useEffect } from "react"; // Import useEffect
+
+// Reflecting the ApiEvent structure (excluding fields managed by backend like id, createdAt, etc.)
+interface EventFormData {
+  name: string;
+  date: string;
+  location: string;
+  description: string;
+  price: string;
+  category: string;
+  image?: string | null; // Optional image
+  // Fields for positioning/pinning if your form handles them
+  positionX?: number | null;
+  positionY?: number | null;
+  isPinned?: boolean;
+  pinOrder?: number | null;
 }
+
+// To match ApiEvent for eventToEdit prop
+interface ApiEvent {
+  id: number;
+  name: string;
+  date: string;
+  location: string;
+  description: string;
+  price: string;
+  category: string;
+  image?: string | null;
+  eventListId: number; // Though not directly used in form fields, it's part of the event
+  createdAt: string;
+  updatedAt: string;
+  positionX?: number | null;
+  positionY?: number | null;
+  isPinned?: boolean;
+  pinOrder?: number | null;
+}
+
 
 interface EventFormProps {
-  isOpen: boolean
-  onClose: () => void
-  onSave: (event: Omit<EventDetails, "id">) => void
-  categories: string[]
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (event: EventFormData & { id?: number }) => void; // id is optional for new events
+  categories: string[];
+  eventToEdit?: ApiEvent | null; // Optional: pass an event to pre-fill the form for editing
 }
 
-const EventForm: React.FC<EventFormProps> = ({ isOpen, onClose, onSave, categories }) => {
-  const [formData, setFormData] = useState<Omit<EventDetails, "id">>({
+const EventForm: React.FC<EventFormProps> = ({ isOpen, onClose, onSave, categories, eventToEdit }) => {
+  const initialFormData: EventFormData = {
     name: "",
     date: "",
     location: "",
     description: "",
     price: "",
-    category: categories.length > 0 ? categories[0] : "",
+    category: categories.length > 0 ? categories[0] : "general", // Default category
     image: "/placeholder.svg?height=300&width=400",
-  })
+    positionX: null,
+    positionY: null,
+    isPinned: false,
+    pinOrder: null,
+  };
+
+  const [formData, setFormData] = useState<EventFormData>(initialFormData);
+
+  useEffect(() => {
+    if (eventToEdit) {
+      setFormData({
+        name: eventToEdit.name,
+        date: eventToEdit.date,
+        location: eventToEdit.location,
+        description: eventToEdit.description,
+        price: String(eventToEdit.price), // Ensure price is string
+        category: eventToEdit.category,
+        image: eventToEdit.image || "/placeholder.svg?height=300&width=400",
+        positionX: eventToEdit.positionX,
+        positionY: eventToEdit.positionY,
+        isPinned: eventToEdit.isPinned,
+        pinOrder: eventToEdit.pinOrder,
+      });
+    } else {
+      // Reset to initial form data (with potentially updated categories)
+      setFormData({
+        ...initialFormData,
+        category: categories.length > 0 ? categories[0] : "general",
+      });
+    }
+  }, [eventToEdit, isOpen, categories]); // Rerun if isOpen changes (form opened/closed) or categories update
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+        const { checked } = e.target as HTMLInputElement;
+        setFormData(prev => ({ ...prev, [name]: checked }));
+    } else {
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'number' ? (value === '' ? null : parseFloat(value)) : value,
+        }));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave(formData)
-    setFormData({
-      name: "",
-      date: "",
-      location: "",
-      description: "",
-      price: "",
-      category: categories.length > 0 ? categories[0] : "",
-      image: "/placeholder.svg?height=300&width=400",
-    })
-  }
+    e.preventDefault();
+    onSave({ ...formData, id: eventToEdit?.id }); // Pass id if editing
+    // No need to reset form here, useEffect handles it when isOpen changes or eventToEdit changes
+  };
 
   if (!isOpen) return null
 
@@ -65,7 +124,7 @@ const EventForm: React.FC<EventFormProps> = ({ isOpen, onClose, onSave, categori
         </button>
 
         <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">Add New Event</h2>
+          <h2 className="text-2xl font-bold mb-4">{eventToEdit ? "Edit Event" : "Add New Event"}</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -178,9 +237,33 @@ const EventForm: React.FC<EventFormProps> = ({ isOpen, onClose, onSave, categori
                 type="submit"
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Add Event
+                {eventToEdit ? "Save Changes" : "Add Event"}
               </button>
             </div>
+            {/* Additional fields for positioning - can be hidden or styled as needed */}
+            <details className="group">
+              <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-800">
+                Advanced Options (Positioning)
+              </summary>
+              <div className="mt-2 space-y-3 p-3 border rounded-md">
+                <div>
+                  <label htmlFor="positionX" className="block text-xs font-medium text-gray-700">Position X (% or px)</label>
+                  <input type="number" step="any" name="positionX" id="positionX" value={formData.positionX ?? ""} onChange={handleChange} className="w-full mt-1 px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 10.5"/>
+                </div>
+                <div>
+                  <label htmlFor="positionY" className="block text-xs font-medium text-gray-700">Position Y (% or px)</label>
+                  <input type="number" step="any" name="positionY" id="positionY" value={formData.positionY ?? ""} onChange={handleChange} className="w-full mt-1 px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 20"/>
+                </div>
+                <div className="flex items-center">
+                  <input type="checkbox" name="isPinned" id="isPinned" checked={formData.isPinned ?? false} onChange={handleChange} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
+                  <label htmlFor="isPinned" className="ml-2 block text-sm text-gray-900">Pin Event</label>
+                </div>
+                 <div>
+                  <label htmlFor="pinOrder" className="block text-xs font-medium text-gray-700">Pin Order (optional)</label>
+                  <input type="number" name="pinOrder" id="pinOrder" value={formData.pinOrder ?? ""} onChange={handleChange} className="w-full mt-1 px-2 py-1 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 1"/>
+                </div>
+              </div>
+            </details>
           </form>
         </div>
       </div>

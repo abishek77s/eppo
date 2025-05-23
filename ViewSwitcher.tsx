@@ -10,7 +10,8 @@ interface ViewSwitcherProps {
   categories: string[]
   selectedCategories: string[]
   onFilterChange: (categories: string[]) => void
-  onAddEvent: () => void
+  onAddEvent: () => void;
+  canAddEvents?: boolean; // New optional prop
 }
 
 const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
@@ -20,25 +21,32 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   selectedCategories,
   onFilterChange,
   onAddEvent,
+  canAddEvents = true, // Default to true if not provided
 }) => {
   return (
     <div className="flex items-center justify-between px-4 p-3 bg-white border-b">
       <div className="flex  items-center gap-2">
         <h1 className="text-xl font-bold">eppo</h1>
-        <p> /Kollywood Blockbusters </p>
-        <p> /2025 </p>
+        {/* Static breadcrumbs, consider making dynamic if needed */}
+        <p> /Event Lists </p> 
+        {/* <p> /2025 </p> */}
       </div>
 
       <div className="flex items-center space-x-2">
-        <button
-          onClick={onAddEvent}
-          className="p-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1"
-          aria-label="Add event"
-          title="Add event"
-        >
-          <Plus size={18} />
-          <span className="text-sm">Add Event</span>
-        </button>
+        {canAddEvents && ( // Conditionally render the button or disable it
+          <button
+            onClick={onAddEvent}
+            disabled={!canAddEvents} // Disable if explicitly false
+            className={`p-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1 ${
+              !canAddEvents ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            aria-label="Add event"
+            title={canAddEvents ? "Add event" : "You do not have permission to add events to this list"}
+          >
+            <Plus size={18} />
+            <span className="text-sm">Add Event</span>
+          </button>
+        )}
 
         <FilterBar categories={categories} selectedCategories={selectedCategories} onFilterChange={onFilterChange} />
 

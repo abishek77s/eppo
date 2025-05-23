@@ -80,12 +80,41 @@ const parseDate = (dateStr: string): Date => {
   return new Date()
 }
 
-const STORAGE_KEY = "noticeboard_events"
+import { useSession } from "next-auth/react";
+
+// Define types for API responses (mirroring Prisma schema where appropriate)
+interface ApiEvent {
+  id: number;
+  name: string;
+  date: string;
+  location: string;
+  description: string;
+  price: string;
+  category: string;
+  image?: string | null;
+  eventListId: number;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+  positionX?: number | null;
+  positionY?: number | null;
+  isPinned?: boolean;
+  pinOrder?: number | null;
+}
+
+interface ApiEventList {
+  id: number;
+  name: string;
+  userId: number;
+  isPublic: boolean;
+  // Omitting events and sharedWith for brevity here, include if needed by NoticeBoard
+  _count?: { events: number };
+  sharedPermission?: string; // If fetching shared lists
+}
 
 const NoticeBoard: React.FC<NoticeboardProps> = ({
-  events: initialEvents,
-  spreadFactor = 60, // Reduced spread factor to keep cards more organized
-  rotationRange = 5, // Reduced rotation for better readability
+  // initialEvents prop is removed, data will be fetched
+  spreadFactor = 60,
+  rotationRange = 5,
   gridRows,
   gridCols,
   cardWidth = 15,
@@ -94,79 +123,167 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
   background = "bg-slate-200 bg-[radial-gradient(#cccccc_5%,#fff_5%)] bg-[length:50px_50px]",
   cardSize = "medium",
 }) => {
-  const [events, setEvents] = useState<EventDetails[]>(initialEvents)
-  const [positions, setPositions] = useState<Position[]>([])
-  const [selectedEvent, setSelectedEvent] = useState<EventDetails | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [clickedCardRect, setClickedCardRect] = useState<DOMRect | null>(null)
-  const [viewType, setViewType] = useState<ViewType>("noticeboard")
-  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth())
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const containerRef = useRef<HTMLDivElement>(null)
+  const { data: session, status: sessionStatus } = useSession();
+  const [events, setEvents] = useState<ApiEvent[]>([]); // Use ApiEvent type
+  const [eventLists, setEventLists] = useState<ApiEventList[]>([]);
+  const [selectedEventListId, setSelectedEventListId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ApiEvent | null>(null);
+  const [clickedCardRect, setClickedCardRect] = useState<DOMRect | null>(null);
+  const [viewType, setViewType] = useState<ViewType>("noticeboard");
+
+  // State for ShareModal
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [eventListToShare, setEventListToShare] = useState<ApiEventList | null>(null);
+  const [forkingListId, setForkingListId] = useState<number | null>(null); // State for fork button loading
+
+  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth());
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const positionsRef = useRef<Position[]>([])
 
-  // Check if we're on mobile
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const mobileCardWidth = isMobile ? 40 : cardWidth;
+  const mobileCardHeight = isMobile ? 35 : cardHeight;
+  const effectiveCardWidth = mobileCardWidth;
+  const effectiveCardHeight = mobileCardHeight;
+  
+  const currentUserId = (session?.user as any)?.id;
 
-  // Adjust card size for mobile
-  const mobileCardWidth = isMobile ? 40 : cardWidth // Wider cards on mobile
-  const mobileCardHeight = isMobile ? 35 : cardHeight // Taller cards on mobile
-  const effectiveCardWidth = mobileCardWidth
-  const effectiveCardHeight = mobileCardHeight
-
-  // Load events from localStorage on initial render
-  useEffect(() => {
-    const loadEvents = () => {
-      try {
-        const storedEvents = localStorage.getItem(STORAGE_KEY)
-        if (storedEvents) {
-          const parsedEvents = JSON.parse(storedEvents) as EventDetails[]
-          setEvents(parsedEvents)
-        }
-      } catch (error) {
-        console.error("Failed to load events from localStorage:", error)
-      }
+  // Explicitly define ApiEventList interface used within NoticeBoard
+  interface ApiEventList {
+    id: number;
+    name: string;
+    userId: number;
+    isPublic: boolean;
+    isOwnedByCurrentUser?: boolean; // Optional because it's added in frontend processing
+    sharedPermission?: 'VIEW_ONLY' | 'EDIT' | null;
+    forkedFromId?: number | null;   // From Prisma schema
+    _count?: { events: number };
+    // Ensure all fields used in the component are here
+  }
+  
+  const fetchEventLists = async (switchToNewListId?: number) => {
+    if (sessionStatus !== "authenticated" || !session?.user) {
+      setEventLists([]);
+      setEvents([]);
+      setSelectedEventListId(null);
+      setIsLoading(false);
+      setError("Please log in to view your events.");
+      return;
     }
 
-    loadEvents()
-  }, [])
-
-  // Save events to localStorage whenever they change
-  useEffect(() => {
+    setIsLoading(true); 
+    setError(null);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
-    } catch (error) {
-      console.error("Failed to save events to localStorage:", error)
-    }
-  }, [events])
+      const response = await fetch("/api/event-lists");
+      if (!response.ok) throw new Error(`Failed to fetch event lists: ${response.statusText}`);
+      const data = await response.json(); // Expect { ownedLists: [], sharedLists: [] }
+      
+      const allListsApi = [...(data.ownedLists || []), ...(data.sharedLists || [])];
+      const processedLists: ApiEventList[] = allListsApi.map(list => ({
+        ...list, // Spread all properties from the API
+        isOwnedByCurrentUser: String(list.userId) === String(currentUserId),
+        // Ensure forkedFromId and isPublic are correctly mapped if not directly on object
+        forkedFromId: list.forkedFromId || null, 
+        isPublic: list.isPublic || false,
+      }));
+      setEventLists(processedLists);
 
-  // Extract unique categories from events
+      if (switchToNewListId) {
+        setSelectedEventListId(switchToNewListId);
+        // Fetching events for this new list will be triggered by the useEffect watching selectedEventListId
+      } else if (processedLists.length > 0) {
+        const currentSelectedListStillExists = processedLists.some(l => l.id === selectedEventListId);
+        if (!currentSelectedListStillExists || !selectedEventListId) {
+          const firstOwned = processedLists.find(l => l.isOwnedByCurrentUser);
+          setSelectedEventListId(firstOwned ? firstOwned.id : processedLists[0].id);
+        }
+        // If a list is selected and still exists, events will be fetched by selectedEventListId's useEffect
+      } else { // No lists exist for the user
+        setEvents([]);
+        setSelectedEventListId(null);
+        setIsLoading(false); // Explicitly stop loading as no events will be fetched
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "An unknown error occurred");
+      setEventLists([]);
+      setEvents([]);
+      setIsLoading(false); // Stop loading on error
+    }
+    // Note: setIsLoading(false) is also handled in the useEffect for fetching events,
+    // ensuring it's turned off after events for the selected list are loaded.
+  };
+
+  useEffect(() => {
+    fetchEventLists();
+  }, [sessionStatus, session, currentUserId]);
+
+  // Fetch events
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (selectedEventListId !== null && sessionStatus === "authenticated") {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const response = await fetch(`/api/events?eventListId=${selectedEventListId}`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch events: ${response.statusText}`);
+          }
+          const fetchedEvents: ApiEvent[] = await response.json();
+          setEvents(fetchedEvents);
+        } catch (err) {
+          console.error(err);
+          setError(err instanceof Error ? err.message : "An unknown error occurred");
+          setEvents([]);
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!selectedEventListId && eventLists.length > 0) {
+        // If no list is selected but lists exist, might mean user needs to pick one
+        // or it's the initial state before default selection.
+        // For now, just ensure events are cleared and loading is false.
+        setEvents([]);
+        setIsLoading(false);
+      } else if (sessionStatus === "unauthenticated") {
+        setIsLoading(false);
+      }
+    };
+    fetchEvents();
+  }, [selectedEventListId, sessionStatus, eventLists.length]);
+
+
+  // Extract unique categories from the currently fetched events
   const categories = useMemo(() => {
-    const uniqueCategories = new Set<string>()
+    const uniqueCategories = new Set<string>();
     events.forEach((event) => {
       if (event.category) {
-        uniqueCategories.add(event.category)
+        uniqueCategories.add(event.category);
       }
-    })
-    return Array.from(uniqueCategories)
-  }, [events])
+    });
+    return Array.from(uniqueCategories);
+  }, [events]);
 
-  // Organize events by month - memoized to prevent recalculation on every render
+  // Organize events by month
   const eventsByMonth = useMemo(() => {
-    return events.reduce<Record<number, EventDetails[]>>((acc, event) => {
-      const date = parseDate(event.date)
-      const month = date.getMonth()
-
+    return events.reduce<Record<number, ApiEvent[]>>((acc, event) => { // Use ApiEvent
+      const date = parseDate(event.date); // Ensure parseDate handles your date format
+      const month = date.getMonth();
       if (!acc[month]) {
-        acc[month] = []
+        acc[month] = [];
       }
-
-      acc[month].push(event)
-      return acc
-    }, {})
-  }, [events])
+      acc[month].push(event);
+      return acc;
+    }, {});
+  }, [events]);
 
   // Get events for the current month and apply filters
   const currentMonthEvents = useMemo(() => {
@@ -238,20 +355,228 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
     setSelectedCategories(categories)
   }
 
-  // Handle adding a new event
+  const selectedListDetails: ApiEventList | undefined = useMemo(() => {
+    return eventLists.find(list => list.id === selectedEventListId);
+  }, [eventLists, selectedEventListId]);
+
+  const canCurrentUserEditSelectedList = useMemo(() => {
+    if (!selectedListDetails || !currentUserId) return false;
+    return !!selectedListDetails.isOwnedByCurrentUser || selectedListDetails.sharedPermission === 'EDIT';
+  }, [selectedListDetails, currentUserId]);
+
+  const canCurrentUserForkSelectedList = useMemo(() => {
+    if (!selectedListDetails || !currentUserId || sessionStatus !== "authenticated") return false;
+    return !selectedListDetails.isOwnedByCurrentUser && 
+           (selectedListDetails.isPublic || !!selectedListDetails.sharedPermission);
+  }, [selectedListDetails, currentUserId, sessionStatus]);
+
+  const handlePinToggle = async (eventToToggle: ApiEvent) => {
+    if (!selectedEventListId || !canCurrentUserEditSelectedList) {
+      alert("You don't have permission to modify events in this list.");
+      return;
+    }
+
+    const newIsPinned = !eventToToggle.isPinned;
+    let newPositionX = eventToToggle.positionX;
+    let newPositionY = eventToToggle.positionY;
+
+    if (newIsPinned) {
+      // If pinning and no explicit positions, try to use current dynamic position
+      if (newPositionX === null || newPositionY === null) {
+        const currentDynamicPos = positions.find((_p, index) => {
+            // This assumes currentMonthEvents maps directly to the order in positions array
+            // This is fragile. A better way would be to store event IDs with their positions.
+            // For now, let's find the event in currentMonthEvents first.
+            const eventInCurrentMonth = currentMonthEvents.findIndex(e => e.id === eventToToggle.id);
+            return positions[eventInCurrentMonth] && index === eventInCurrentMonth;
+        });
+         // Find the index of eventToToggle in the `events` array to map to `positions`
+        const eventIndex = events.findIndex(e => e.id === eventToToggle.id);
+
+
+        if (eventIndex !== -1 && positions[eventIndex]) {
+          // Convert percentage to a simple number, assuming positions are stored 0-100
+          newPositionX = positions[eventIndex].left; 
+          newPositionY = positions[eventIndex].top;
+        } else {
+          // Default to top-left if current position can't be determined
+          newPositionX = 5; 
+          newPositionY = 5;
+          alert("Could not determine current card position. Pinning to default top-left. You can adjust in the edit form.");
+        }
+      }
+    }
+    // For unpinning, we can send nulls or let backend handle clearing if that's the logic
+    // For now, we'll send current values or nulls if unpinning and they should be cleared.
+    // if (!newIsPinned) {
+    //   newPositionX = null;
+    //   newPositionY = null;
+    // }
+
+
+    const payload = {
+      ...eventToToggle, // Spread existing event data
+      isPinned: newIsPinned,
+      positionX: newPositionX,
+      positionY: newPositionY,
+      // Ensure other required fields for update are present if any, or strip them if not needed for this partial update
+      // For example, eventListId is part of the URL, not payload for update usually.
+    };
+    // Remove fields not expected by PUT /api/events/:id body, or ensure API handles extra fields gracefully
+    delete payload.eventListId; 
+    delete payload.createdAt;
+    delete payload.updatedAt;
+
+
+    try {
+      const response = await fetch(`/api/events/${eventToToggle.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update event pin status.');
+      }
+      const updatedEvent = await response.json();
+      // Update local state
+      setEvents(prevEvents => prevEvents.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+      // If the selectedEvent in modal was this one, update it too
+      if (selectedEvent?.id === updatedEvent.id) {
+        setSelectedEvent(updatedEvent);
+      }
+
+    } catch (err) {
+      console.error("Pin toggle error:", err);
+      alert(err instanceof Error ? err.message : "Failed to update pin status.");
+    }
+  };
+  
+  const handleForkList = async (listIdToFork: number) => {
+    if (!listIdToFork) return;
+    setForkingListId(listIdToFork);
+    setError(null);
+  
+    try {
+      const response = await fetch(`/api/event-lists/${listIdToFork}/fork`, { method: 'POST' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fork event list.');
+      }
+      const newForkedList: ApiEventList = await response.json();
+      alert(`List "${selectedListDetails?.name || 'Original list'}" forked successfully as "${newForkedList.name}"!`);
+      // Refresh lists and switch to the new forked list
+      await fetchEventLists(newForkedList.id); 
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during forking.";
+      setError(errorMessage);
+      alert(errorMessage); // Simple feedback for now
+    } finally {
+      setForkingListId(null);
+    }
+  };
+
+
   const handleAddEvent = () => {
-    setIsFormOpen(true)
-  }
+    if (!canCurrentUserEditSelectedList) {
+      alert("You don't have permission to add events to this list.");
+      return;
+    }
+    setEditingEvent(null);
+    setIsFormOpen(true);
+  };
 
-  // Handle saving a new event
-  const handleSaveEvent = (newEvent: Omit<EventDetails, "id">) => {
-    const newId = Math.max(0, ...events.map((e) => e.id)) + 1
-    const eventWithId = { ...newEvent, id: newId }
-    setEvents((prevEvents) => [...prevEvents, eventWithId])
-    setIsFormOpen(false)
-  }
+  const handleEditEvent = (eventToEdit: ApiEvent) => {
+     if (!canCurrentUserEditSelectedList) {
+      alert("You don't have permission to edit events in this list.");
+      return;
+    }
+    setEditingEvent(eventToEdit);
+    setIsFormOpen(true);
+  };
 
-  // Calculate grid dimensions - memoized to prevent recalculation on every render
+  const handleDeleteEvent = async (eventId: number) => {
+    if (!selectedEventListId || !window.confirm("Are you sure you want to delete this event?")) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/events/${eventId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete event');
+      }
+      setEvents((prevEvents) => prevEvents.filter(event => event.id !== eventId));
+      if(selectedEvent?.id === eventId) {
+        closeModal();
+      }
+    } catch (err) {
+      console.error("Delete event error:", err);
+      setError(err instanceof Error ? err.message : "Failed to delete event");
+    }
+  };
+
+
+  const handleSaveEvent = async (eventData: Omit<ApiEvent, "id" | "createdAt" | "updatedAt" | "eventListId"> & { id?: number }) => {
+    if (!selectedEventListId || !canCurrentUserEditSelectedList) {
+      setError(canCurrentUserEditSelectedList ? "No event list selected." : "You don't have permission to save events to this list.");
+      return;
+    }
+
+    const payload = {
+      ...eventData,
+      eventListId: selectedEventListId,
+      // Ensure numeric fields are numbers if your form gives strings
+      price: String(eventData.price), // API expects string for price as per schema
+      positionX: eventData.positionX ? parseFloat(String(eventData.positionX)) : null,
+      positionY: eventData.positionY ? parseFloat(String(eventData.positionY)) : null,
+      isPinned: Boolean(eventData.isPinned),
+      pinOrder: eventData.pinOrder ? parseInt(String(eventData.pinOrder), 10) : null,
+    };
+
+    try {
+      let response;
+      let newOrUpdatedEvent;
+
+      if (editingEvent && editingEvent.id) { // Update existing event
+        response = await fetch(`/api/events/${editingEvent.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update event');
+        }
+        newOrUpdatedEvent = await response.json();
+        setEvents((prevEvents) => 
+          prevEvents.map(event => event.id === newOrUpdatedEvent.id ? newOrUpdatedEvent : event)
+        );
+      } else { // Create new event
+        response = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create event');
+        }
+        newOrUpdatedEvent = await response.json();
+        setEvents((prevEvents) => [...prevEvents, newOrUpdatedEvent]);
+      }
+      
+      setIsFormOpen(false);
+      setEditingEvent(null);
+    } catch (err) {
+      console.error("Save event error:", err);
+      setError(err instanceof Error ? err.message : "Failed to save event");
+    }
+  };
+
+    // Calculate grid dimensions - memoized to prevent recalculation on every render
   const calculateGrid = useMemo(() => {
     if (!containerRef.current) return { rows: 3, cols: isMobile ? 2 : 4 }
 
@@ -439,18 +764,65 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
             orientation={isMobile ? "horizontal" : "vertical"}
           />
                 </div>
-          
                 <div className="flex-1 flex flex-col">
-          <div
-            ref={containerRef}
-            className={`flex-1 p-4 md:p-8 w-full ${
-              viewType === "noticeboard" ? background : "bg-gray-50"
-            } overflow-auto relative`}
-          >
-            <div className={`relative h-full w-full ${viewType === "list" ? "flex flex-col gap-4 p-2" : ""}`}>
-              {currentMonthEvents.map((event, index) => (
-                <motion.div
-                  key={event.id}
+                  {/* Event List Selector and Share Button */}
+                  {eventLists.length > 0 && (
+                    <div className="p-2 bg-gray-100 border-b flex items-center justify-between">
+                      <div>
+                        <label htmlFor="event-list-selector" className="mr-2 text-sm font-medium text-gray-700">Event List:</label>
+                        <select
+                          id="event-list-selector"
+                          value={selectedEventListId ?? ""}
+                          onChange={(e) => setSelectedEventListId(Number(e.target.value))}
+                          className="p-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        >
+                          {eventLists.map(list => (
+                            <option key={list.id} value={list.id}>
+                              {list.name}
+                              {!list.isOwnedByCurrentUser && list.sharedPermission ? ` (Shared - ${list.sharedPermission === 'EDIT' ? 'Edit' : 'View'})` : ''}
+                              {!list.isOwnedByCurrentUser && !list.sharedPermission && list.isPublic ? ` (Public)` : ''}
+                              {list.isOwnedByCurrentUser ? ` (Owner)` : ''}
+                              {' '}({list._count?.events || 0})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {selectedListDetails?.isOwnedByCurrentUser && (
+                        <button
+                          onClick={() => {
+                            setEventListToShare(selectedListDetails);
+                            setIsShareModalOpen(true);
+                          }}
+                          className="ml-2 px-3 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        >
+                          Share List
+                        </button>
+                      )}
+                      {/* Fork List Button */}
+                      {canCurrentUserForkSelectedList && selectedEventListId && (
+                        <button
+                          onClick={() => handleForkList(selectedEventListId)}
+                          disabled={forkingListId === selectedEventListId}
+                          className="ml-2 px-3 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                        >
+                          {forkingListId === selectedEventListId ? "Forking..." : "Fork List"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div
+                    ref={containerRef}
+                    className={`flex-1 p-4 md:p-8 w-full ${
+                      viewType === "noticeboard" ? background : "bg-gray-50"
+                    } overflow-auto relative`}
+                  >
+                    {isLoading && <div className="flex items-center justify-center h-full"><p>Loading events...</p></div>}
+                    {!isLoading && error && <div className="flex items-center justify-center h-full"><p className="text-red-500">{error}</p></div>}
+                    {!isLoading && !error && (
+                      <div className={`relative h-full w-full ${viewType === "list" ? "flex flex-col gap-4 p-2" : ""}`}>
+                        {currentMonthEvents.map((event, index) => (
+                          <motion.div
+                            key={event.id}
                   ref={(el: HTMLDivElement | null) => {
                     cardRefs.current[index] = el;
                   }}
@@ -488,50 +860,106 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
                   }}
                   onClick={() => handleCardClick(event, index)}
                 >
-                  <EventCard
-                    eventDetails={event}
-                    pinColor={event.category === "featured" ? "blue" : "red"}
-                    hoverEffect="scale"
-                    size={isMobile ? "medium" : cardSize}
-                    viewType={viewType}
-                  />
-                </motion.div>
-              ))}
-              {currentMonthEvents.length === 0 && (
-                <div className="flex items-center justify-center h-full w-full">
-                  <div className="text-center p-8 bg-white/80 rounded-lg shadow-sm">
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">No events this month</h3>
-                    <p className="text-gray-500">
-                      {selectedCategories.length > 0
-                        ? "Try selecting different categories or changing the month."
-                        : "Try selecting a different month or adding new events."}
-                    </p>
+                            <EventCard
+                              // Pass ApiEvent as eventDetails
+                              eventDetails={{
+                                ...event,
+                                // Ensure all fields expected by EventCard are present
+                                // If EventCard expects 'image' and it can be null from API, provide a fallback
+                                image: event.image || "/placeholder.svg?height=300&width=400",
+                              }}
+                              pinColor={event.category === "featured" ? "blue" : "red"} // Example, adjust as needed
+                              hoverEffect="scale"
+                              size={isMobile ? "medium" : cardSize}
+                              viewType={viewType}
+                              // Add onDelete and onEdit props to EventCard if you want buttons there
+                              // onDelete={() => handleDeleteEvent(event.id)}
+                              // onEdit={() => handleEditEvent(event)}
+                            />
+                          </motion.div>
+                        ))}
+                        {currentMonthEvents.length === 0 && !isLoading && (
+                           <div className="flex items-center justify-center h-full w-full">
+                             <div className="text-center p-8 bg-white/80 rounded-lg shadow-sm">
+                               <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                                 {eventLists.length === 0 && sessionStatus === "authenticated" ? "Create an event list to get started!" : "No events this month"}
+                               </h3>
+                               <p className="text-gray-500">
+                                 {selectedCategories.length > 0
+                                   ? "Try selecting different categories or changing the month."
+                                   : eventLists.length > 0 ? "Try selecting a different month or adding new events to this list." : "Log in and create an event list to add events."}
+                               </p>
+                               {sessionStatus === "unauthenticated" && (
+                                  <Link href="/login" className="mt-4 inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                    Login
+                                  </Link>
+                                )}
+                             </div>
+                           </div>
+                         )}
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-                </div>
           
-                {/* Full event modal */}
                 <AnimatePresence>
-          {isModalOpen && selectedEvent && (
-            <EventModal
-              event={selectedEvent}
-              isOpen={isModalOpen}
-              onClose={closeModal}
-              sourceRect={clickedCardRect}
-              isMobile={isMobile}
-            />
-          )}
+                  {isModalOpen && selectedEvent && (
+                    <EventModal
+                      event={selectedEvent}
+                      isOpen={isModalOpen}
+                      onClose={closeModal}
+                      sourceRect={clickedCardRect}
+                      isMobile={isMobile}
+                      onEdit={() => {
+                        if (selectedEvent) {
+                           // Check if the user can edit this event (is owner or has edit permission on list)
+                           const list = eventLists.find(l => l.id === selectedEvent.eventListId);
+                           const isOwner = list?.userId === parseInt((session?.user as any)?.id);
+                           const canEditShared = list?.sharedPermission === 'EDIT';
+                           if(isOwner || canEditShared) {
+                            handleEditEvent(selectedEvent);
+                           } else {
+                            alert("You don't have permission to edit this event.");
+                           }
+                        }
+                      }}
+                      onEdit={() => {
+                        if (selectedEvent && canCurrentUserEditSelectedList) {
+                          handleEditEvent(selectedEvent);
+                        } else if (!canCurrentUserEditSelectedList) {
+                          alert("You don't have permission to edit events in this list.");
+                        }
+                      }}
+                      onDelete={() => {
+                        if (selectedEvent && canCurrentUserEditSelectedList) {
+                          handleDeleteEvent(selectedEvent.id);
+                        } else if (!canCurrentUserEditSelectedList) {
+                           alert("You don't have permission to delete events in this list.");
+                        }
+                      }}
+                      canEdit={canCurrentUserEditSelectedList} // Pass this to EventModal
+                    />
+                  )}
                 </AnimatePresence>
           
-                {/* Event form */}
-                <EventForm
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          onSave={handleSaveEvent}
-          categories={categories}
+                {canCurrentUserEditSelectedList && (
+                  <EventForm
+                    isOpen={isFormOpen}
+                    onClose={() => { setIsFormOpen(false); setEditingEvent(null); }}
+                    onSave={handleSaveEvent}
+                    categories={categories}
+                    eventToEdit={editingEvent}
+                  />
+                )}
+
+                <ShareModal
+                  isOpen={isShareModalOpen}
+                  onClose={() => {
+                    setIsShareModalOpen(false);
+                    fetchEventLists(); // Re-fetch lists to get updated share info
+                  }}
+                  eventList={eventListToShare}
+                  currentUserId={currentUserId}
                 />
               </div>
         </div>
