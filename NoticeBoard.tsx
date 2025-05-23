@@ -224,7 +224,6 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
   };
 
   useEffect(() => {
-  useEffect(() => {
     fetchEventLists();
   }, [sessionStatus, session, currentUserId]);
 
