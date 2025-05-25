@@ -12,28 +12,85 @@ interface MonthScrollbarProps {
 const MonthScrollbar: React.FC<MonthScrollbarProps> = ({
   currentMonth,
   onMonthChange,
-  orientation = "auto",
+  orientation = "auto", // 'auto' will use md breakpoint to switch
 }) => {
   const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ]
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ]; // Shortened for space, especially horizontal
+
+  // M3: Use surface colors, on-surface text, primary for active indicator
+  const commonItemClass = "relative cursor-pointer whitespace-nowrap text-center text-label-lg";
+  const activeClass = "font-semibold text-primary"; // M3: Primary color for active text
+  const inactiveClass = "text-on-surface-variant hover:text-on-surface";
+
+  const motionProps = {
+    layoutId: orientation === "horizontal" ? "activeMonthHorizontal" : "activeMonthVertical",
+    className: "absolute inset-0 bg-primary-container rounded-md z-0", // M3: Primary container for selection
+    initial: false,
+    transition: { type: "spring", stiffness: 350, damping: 30 }, // M3 Emphasized Easing
+  };
 
   const Horizontal = (
-    <div className="w-full bg-white border-t border-gray-200 flex items-center overflow-x-auto fixed bottom-0 left-0 z-10">
-      <div className="flex px-2 w-full justify-evenly">
+    // M3: Bottom app bars / navigation often use surface container or surface with elevation
+    <div className="w-full bg-surface-variant border-t border-outline-variant flex items-center overflow-x-auto fixed bottom-0 left-0 z-30 h-14 shadow-md">
+      {/* Increased height for better touch, shadow for elevation */}
+      <div className="flex px-1 w-full justify-around"> {/* justify-around for better spacing */}
         {months.map((month, index) => (
           <div
             key={month}
-            className={`relative cursor-pointer px-2 py-2 whitespace-nowrap ${
-              currentMonth === index ? "font-bold" : "text-gray-500 hover:text-gray-800"
+            className={`${commonItemClass} px-3 py-3.5 ${ // Increased padding for touch
+              currentMonth === index ? activeClass : inactiveClass
             }`}
             onClick={() => onMonthChange(index)}
           >
             {currentMonth === index && (
-              <motion.div
-                layoutId="activeMonthHorizontal"
-                className="absolute inset-0 bg-blue-50 rounded-md z-0"
+              <motion.div {...motionProps} />
+            )}
+            <span className="relative z-10">{month}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const Vertical = (
+    // M3: Navigation rails or sidebars use surface colors
+    <div className="w-full h-full bg-surface-variant border-r border-outline-variant flex flex-col">
+      <div className="flex-1 overflow-auto py-2 space-y-1"> {/* Added space-y for separation */}
+        {months.map((month, index) => (
+          <div
+            key={month}
+            className={`${commonItemClass} px-2 py-3 mx-1 ${ // Added horizontal margin
+              currentMonth === index ? activeClass : inactiveClass
+            }`}
+            onClick={() => onMonthChange(index)}
+          >
+            {currentMonth === index && (
+              <motion.div {...motionProps} />
+            )}
+            <span className="relative z-10">{month}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Default: auto (responsive) - this logic switches based on 'md' breakpoint
+  // If 'auto' is desired, it might be better to handle the switch directly via CSS classes
+  // or ensure the parent component correctly sets 'horizontal' or 'vertical' based on useMediaQuery.
+  // The current 'auto' here renders both and relies on CSS (hidden md:block) which is fine.
+  if (orientation === "horizontal") return Horizontal;
+  if (orientation === "vertical") return Vertical;
+  
+  // Fallback for 'auto' if not explicitly handled by parent (NoticeBoard does this)
+  return (
+    <>
+      <div className="hidden md:block h-full">{Vertical}</div> {/* Ensure h-full for vertical */}
+      <div className="block md:hidden">{Horizontal}</div>
+    </>
+  );
+};
                 initial={false}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
