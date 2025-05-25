@@ -1,9 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  /* Updated to Roboto Flex, with fallbacks */
+  font-family: 'Roboto Flex', Arial, Helvetica, sans-serif;
 }
 
 @layer utilities {
@@ -14,81 +17,202 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
+    /* Material 3 Inspired Light Theme Color Palette */
+    /* Primary (Blue) */
+    --primary-hue: 220; /* Adjusted for a slightly softer blue */
+    --primary-saturation: 85%;
+    --primary-lightness: 60%;
+    --primary: var(--primary-hue) var(--primary-saturation) var(--primary-lightness);
+    --on-primary: var(--primary-hue) 20% 98%; /* Almost white */
+    --primary-container: var(--primary-hue) 70% 90%; /* Light primary for containers */
+    --on-primary-container: var(--primary-hue) 80% 10%; /* Dark text on primary container */
+
+    /* Secondary (Tealish Blue) */
+    --secondary-hue: 190;
+    --secondary-saturation: 70%;
+    --secondary-lightness: 55%;
+    --secondary: var(--secondary-hue) var(--secondary-saturation) var(--secondary-lightness);
+    --on-secondary: var(--secondary-hue) 20% 98%;
+    --secondary-container: var(--secondary-hue) 60% 90%;
+    --on-secondary-container: var(--secondary-hue) 70% 8%;
+
+    /* Tertiary (Orange) */
+    --tertiary-hue: 25; 
+    --tertiary-saturation: 90%;
+    --tertiary-lightness: 60%;
+    --tertiary: var(--tertiary-hue) var(--tertiary-saturation) var(--tertiary-lightness);
+    --on-tertiary: var(--tertiary-hue) 30% 98%;
+    --tertiary-container: var(--tertiary-hue) 75% 90%;
+    --on-tertiary-container: var(--tertiary-hue) 85% 9%;
+
+    /* Error */
+    --error-hue: 0;
+    --error-saturation: 84%;
+    --error-lightness: 60%;
+    --error: var(--error-hue) var(--error-saturation) var(--error-lightness);
+    --on-error: 0 0% 100%; /* White */
+    --error-container: var(--error-hue) 70% 92%;
+    --on-error-container: var(--error-hue) 70% 10%;
+
+    /* Neutral & Surfaces */
+    --neutral-hue: 210; /* Cool gray */
+    --background: var(--neutral-hue) 15% 98%; /* Surface - Almost white */
+    --on-background: var(--neutral-hue) 10% 10%; /* On Surface */
+    
+    --surface: var(--neutral-hue) 15% 98%;
+    --on-surface: var(--neutral-hue) 10% 10%;
+    
+    --surface-variant: var(--neutral-hue) 12% 92%; /* Slightly off-white/gray for card backgrounds */
+    --on-surface-variant: var(--neutral-hue) 10% 25%; /* Darker gray text on surface variant */
+    
+    --outline: var(--neutral-hue) 10% 65%; /* For borders */
+    --outline-variant: var(--neutral-hue) 10% 85%; /* Lighter borders */
+
+    --shadow: var(--neutral-hue) 10% 5%;
+
+    /* Original variables - mapped or replaced */
+    --foreground: var(--on-background); /* Mapped to on-background */
+    
+    --card: var(--surface-variant); /* Mapped to surface-variant or a dedicated surface container */
+    --card-foreground: var(--on-surface-variant);
+
+    --popover: var(--surface); /* Popovers are surfaces */
+    --popover-foreground: var(--on-surface);
+
+    /* Primary is defined above */
+    --primary-foreground: var(--on-primary);
+    
+    /* Secondary is defined above */
+    --secondary-foreground: var(--on-secondary);
+
+    --muted: var(--neutral-hue) 15% 90%; /* A muted surface variant */
+    --muted-foreground: var(--neutral-hue) 10% 45%; /* Muted text */
+
+    --accent: var(--secondary-container); /* Accent can map to secondary container or tertiary */
+    --accent-foreground: var(--on-secondary-container);
+
+    --destructive: var(--error);
+    --destructive-foreground: var(--on-error);
+    
+    --border: var(--outline);
+    --input: var(--neutral-hue) 20% 96%; /* Input background - slightly different from surface */
+    --ring: var(--primary); /* Ring focus often uses primary */
+
+    --chart-1: 12 76% 61%; /* Keep chart colors or update if needed */
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* M3 Shape - Border Radius */
+    --radius-xs: 0.25rem; /* 4px */
+    --radius-sm: 0.5rem;  /* 8px */
+    --radius-md: 0.75rem; /* 12px */
+    --radius-lg: 1rem;    /* 16px */
+    --radius-xl: 1.75rem; /* 28px */
+    --radius-full: 9999px;
+    
+    /* Using md as the base for existing --radius variable */
+    --radius: var(--radius-md); 
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Material 3 Inspired Dark Theme Color Palette */
+    /* Primary (Blue) */
+    --primary-hue: 220;
+    --primary-saturation: 75%; /* Slightly less saturated for dark mode */
+    --primary-lightness: 75%; /* Lighter primary for dark mode */
+    --primary: var(--primary-hue) var(--primary-saturation) var(--primary-lightness);
+    --on-primary: var(--primary-hue) 80% 15%; /* Dark text on light primary */
+    --primary-container: var(--primary-hue) 60% 25%; /* Darker primary container */
+    --on-primary-container: var(--primary-hue) 70% 90%; /* Light text on dark primary container */
+
+    /* Secondary (Tealish Blue) */
+    --secondary-hue: 190;
+    --secondary-saturation: 60%;
+    --secondary-lightness: 70%;
+    --secondary: var(--secondary-hue) var(--secondary-saturation) var(--secondary-lightness);
+    --on-secondary: var(--secondary-hue) 80% 12%;
+    --secondary-container: var(--secondary-hue) 50% 22%;
+    --on-secondary-container: var(--secondary-hue) 60% 88%;
+
+    /* Tertiary (Orange) */
+    --tertiary-hue: 25;
+    --tertiary-saturation: 75%;
+    --tertiary-lightness: 70%;
+    --tertiary: var(--tertiary-hue) var(--tertiary-saturation) var(--tertiary-lightness);
+    --on-tertiary: var(--tertiary-hue) 85% 13%;
+    --tertiary-container: var(--tertiary-hue) 65% 24%;
+    --on-tertiary-container: var(--tertiary-hue) 75% 89%;
+
+    /* Error */
+    --error-hue: 0;
+    --error-saturation: 70%;
+    --error-lightness: 70%;
+    --error: var(--error-hue) var(--error-saturation) var(--error-lightness);
+    --on-error: var(--error-hue) 80% 15%;
+    --error-container: var(--error-hue) 60% 28%;
+    --on-error-container: var(--error-hue) 70% 90%;
+
+    /* Neutral & Surfaces */
+    --neutral-hue: 210;
+    --background: var(--neutral-hue) 10% 10%; /* Surface - Dark gray */
+    --on-background: var(--neutral-hue) 15% 90%; /* On Surface - Light gray/white */
+    
+    --surface: var(--neutral-hue) 10% 10%;
+    --on-surface: var(--neutral-hue) 15% 90%;
+    
+    --surface-variant: var(--neutral-hue) 8% 18%; /* Darker gray for card backgrounds */
+    --on-surface-variant: var(--neutral-hue) 10% 75%; /* Lighter gray text */
+    
+    --outline: var(--neutral-hue) 10% 50%; /* Borders in dark mode */
+    --outline-variant: var(--neutral-hue) 10% 30%; /* Darker, subtle borders */
+    
+    --shadow: var(--neutral-hue) 0% 0%; /* Shadows are less pronounced or different in dark mode */
+
+    /* Original variables - mapped or replaced */
+    --foreground: var(--on-background);
+    
+    --card: var(--surface-variant);
+    --card-foreground: var(--on-surface-variant);
+
+    --popover: var(--neutral-hue) 5% 15%; /* Slightly different surface for popovers */
+    --popover-foreground: var(--on-surface);
+
+    --primary-foreground: var(--on-primary);
+    --secondary-foreground: var(--on-secondary);
+
+    --muted: var(--neutral-hue) 10% 20%;
+    --muted-foreground: var(--neutral-hue) 15% 65%;
+
+    --accent: var(--secondary-container);
+    --accent-foreground: var(--on-secondary-container);
+
+    --destructive: var(--error);
+    --destructive-foreground: var(--on-error);
+    
+    --border: var(--outline);
+    --input: var(--neutral-hue) 10% 15%; /* Input background in dark mode */
+    --ring: var(--primary);
+
+    /* Chart colors can also be themed for dark mode */
+    --chart-1: 220 70% 60%;
+    --chart-2: 160 60% 55%;
+    --chart-3: 30 80% 65%;
+    --chart-4: 280 65% 70%;
+    --chart-5: 340 75% 65%;
+
+    /* Sidebar vars were not in the original root, but if used, should be themed */
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border; /* Uses the new --border -> --outline mapping */
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground; /* Uses new --background and --on-background */
   }
 }
+
+[end of app/globals.css]

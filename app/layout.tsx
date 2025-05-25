@@ -7,14 +7,25 @@ export const metadata: Metadata = {
   generator: 'v0.dev',
 }
 
+import { ThemeProvider } from "@/components/theme-provider"; // Assuming path is components/theme-provider
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }
