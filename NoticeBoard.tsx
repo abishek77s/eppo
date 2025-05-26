@@ -544,14 +544,12 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
                     rotate: positions[index].rotate,
                     scale: 1,
                     opacity: 1,
-                  } : { // Default for list or non-positioned items
-                    scale: 1,
-                    opacity: 1,
-                  } : { // Default for list or non-positioned items
-                    // List items don't need complex animation here, layout handles it.
+                  } : { // Default for list items or when positions are not yet available
+                    scale: 1, // Ensure list items are scaled correctly
+                    opacity: 1, // Ensure list items are visible
+                    // No positional animation for list items, handled by flex/grid
                   }}
                   // M3 Motion: "Emphasized" for appearing elements.
-                  // (spring with stiffness ~350-400, damping ~30-35)
                   // This variant is for the card appearing on the board.
                   variants={{
                     hidden: { opacity: 0, scale: 0.85, y: 20 },
@@ -572,21 +570,17 @@ const NoticeBoard: React.FC<NoticeboardProps> = ({
                    exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }} // Faster exit
                    layout // Animate layout changes (e.g. when filtering)
                    transition={{ type: "spring", stiffness: 400, damping: 40 }} // M3: Shared axis transitions
-                  whileHover={viewType === "noticeboard" ? {
-                    scale: 1.03, // M3: Subtle hover states
-                    zIndex: (positions[index]?.zIndex || 0) + 1000, 
-                    transition: {
-                      delay: index * 0.05,
-                      duration: 0.5,
-                      type: "spring",
-                      stiffness: 100,
-                    },
-                  }}
-                  whileHover={{
-                    scale: 1.05,
-                    zIndex: 30,
-                    transition: { type: "spring", stiffness: 400, damping: 15 }, // Quick pop on hover
-                  }}
+                  whileHover={
+                    viewType === "noticeboard" && positions[index] ? {
+                      scale: 1.05, // More prominent scale from the second original prop
+                      zIndex: (positions[index].zIndex || 0) + 1000, // Dynamic zIndex from the first original prop
+                      transition: { type: "spring", stiffness: 400, damping: 15 } // Quick pop from the second original prop
+                    } : {
+                      // Optional: Define a subtle hover for list view if desired, e.g.
+                      // scale: 1.01,
+                      // backgroundColor: "hsl(var(--surface-variant-hover))", // Assuming such a variable exists
+                    }
+                  }
                   onClick={() => handleCardClick(event, index)}
                 >
                   <EventCard // EventCard itself is now M3 styled
